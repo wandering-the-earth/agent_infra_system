@@ -1,0 +1,225 @@
+{
+  "cases": [
+    {
+      "name": "allow_low_read",
+      "request": {
+        "request_id": "req-001",
+        "trace_id": "tr-001",
+        "tenant_id": "tenant-a",
+        "workflow_id": "wf-support",
+        "run_id": "run-001",
+        "step_id": "step-1",
+        "decision_graph_id": "dg-001",
+        "risk_tier": "low",
+        "effect_type": "read",
+        "feature_version": "fv-001",
+        "feature_evidence_ref": "evidence://feature/fv-001",
+        "feature_producer_id": "feature-producer-default",
+        "approval_system_available": true,
+        "phase": "PRE_TOOL",
+        "dcu_input": {
+          "feature_reads": 2,
+          "rule_evals": 3,
+          "dependency_calls": 1,
+          "conflict_resolutions": 0
+        },
+        "freeze": {
+          "frozen": {
+            "context_candidates_snapshot_ref": "ctx-snap-001",
+            "policy_bundle_snapshot_ref": "policy-snap-001",
+            "feature_snapshot_id": "feat-snap-001",
+            "approval_routing_snapshot_ref": "route-snap-001",
+            "quota_snapshot_ref": "quota-snap-001",
+            "scheduler_admission_input_snapshot_ref": "sched-snap-001"
+          },
+          "dynamic_used": [
+            "trace_tags"
+          ]
+        }
+      },
+      "expect": {
+        "decision": "allow",
+        "reason_codes": [
+          "baseline_allow"
+        ]
+      }
+    },
+    {
+      "name": "require_approval_high_external_write",
+      "request": {
+        "request_id": "req-002",
+        "trace_id": "tr-002",
+        "tenant_id": "tenant-a",
+        "workflow_id": "wf-billing",
+        "run_id": "run-002",
+        "step_id": "step-2",
+        "decision_graph_id": "dg-002",
+        "risk_tier": "high",
+        "effect_type": "external_write",
+        "feature_version": "fv-002",
+        "feature_evidence_ref": "evidence://feature/fv-002",
+        "feature_producer_id": "feature-producer-default",
+        "approval_system_available": true,
+        "phase": "PRE_TOOL",
+        "dcu_input": {
+          "feature_reads": 3,
+          "rule_evals": 3,
+          "dependency_calls": 1,
+          "conflict_resolutions": 1
+        },
+        "freeze": {
+          "frozen": {
+            "context_candidates_snapshot_ref": "ctx-snap-002",
+            "policy_bundle_snapshot_ref": "policy-snap-002",
+            "feature_snapshot_id": "feat-snap-002",
+            "approval_routing_snapshot_ref": "route-snap-002",
+            "quota_snapshot_ref": "quota-snap-002",
+            "scheduler_admission_input_snapshot_ref": "sched-snap-002"
+          },
+          "dynamic_used": [
+            "trace_tags",
+            "debug_hints_low_risk"
+          ]
+        }
+      },
+      "expect": {
+        "decision": "require_approval",
+        "reason_codes": [
+          "policy_decision_applied"
+        ]
+      }
+    },
+    {
+      "name": "review_required_medium_missing_frozen",
+      "request": {
+        "request_id": "req-003",
+        "trace_id": "tr-003",
+        "tenant_id": "tenant-a",
+        "workflow_id": "wf-ops",
+        "run_id": "run-003",
+        "step_id": "step-3",
+        "decision_graph_id": "dg-003",
+        "risk_tier": "medium",
+        "effect_type": "write",
+        "feature_version": "fv-003",
+        "feature_evidence_ref": "evidence://feature/fv-003",
+        "feature_producer_id": "feature-producer-default",
+        "approval_system_available": true,
+        "phase": "PRE_TOOL",
+        "dcu_input": {
+          "feature_reads": 2,
+          "rule_evals": 2,
+          "dependency_calls": 1,
+          "conflict_resolutions": 0
+        },
+        "freeze": {
+          "frozen": {
+            "context_candidates_snapshot_ref": "ctx-snap-003",
+            "policy_bundle_snapshot_ref": "policy-snap-003",
+            "feature_snapshot_id": "",
+            "approval_routing_snapshot_ref": "route-snap-003",
+            "quota_snapshot_ref": "quota-snap-003",
+            "scheduler_admission_input_snapshot_ref": "sched-snap-003"
+          },
+          "dynamic_used": [
+            "trace_tags"
+          ]
+        }
+      },
+      "expect": {
+        "decision": "review_required",
+        "reason_codes": [
+          "freeze_input_missing"
+        ]
+      }
+    },
+    {
+      "name": "fail_closed_high_missing_frozen",
+      "request": {
+        "request_id": "req-004",
+        "trace_id": "tr-004",
+        "tenant_id": "tenant-a",
+        "workflow_id": "wf-ops",
+        "run_id": "run-004",
+        "step_id": "step-4",
+        "decision_graph_id": "dg-004",
+        "risk_tier": "high",
+        "effect_type": "write",
+        "feature_version": "fv-004",
+        "feature_evidence_ref": "evidence://feature/fv-004",
+        "feature_producer_id": "feature-producer-default",
+        "approval_system_available": true,
+        "phase": "PRE_TOOL",
+        "dcu_input": {
+          "feature_reads": 2,
+          "rule_evals": 2,
+          "dependency_calls": 1,
+          "conflict_resolutions": 0
+        },
+        "freeze": {
+          "frozen": {
+            "context_candidates_snapshot_ref": "ctx-snap-004",
+            "policy_bundle_snapshot_ref": "policy-snap-004",
+            "feature_snapshot_id": "",
+            "approval_routing_snapshot_ref": "route-snap-004",
+            "quota_snapshot_ref": "quota-snap-004",
+            "scheduler_admission_input_snapshot_ref": "sched-snap-004"
+          },
+          "dynamic_used": [
+            "trace_tags"
+          ]
+        }
+      },
+      "expect": {
+        "decision": "fail_closed",
+        "reason_codes": [
+          "freeze_input_missing"
+        ]
+      }
+    },
+    {
+      "name": "dcu_exceeded_critical_fail_closed",
+      "request": {
+        "request_id": "req-005",
+        "trace_id": "tr-005",
+        "tenant_id": "tenant-a",
+        "workflow_id": "wf-risk",
+        "run_id": "run-005",
+        "step_id": "step-5",
+        "decision_graph_id": "dg-005",
+        "risk_tier": "critical",
+        "effect_type": "write",
+        "feature_version": "fv-005",
+        "feature_evidence_ref": "evidence://feature/fv-005",
+        "feature_producer_id": "feature-producer-default",
+        "approval_system_available": true,
+        "phase": "PRE_TOOL",
+        "dcu_input": {
+          "feature_reads": 30,
+          "rule_evals": 60,
+          "dependency_calls": 30,
+          "conflict_resolutions": 30
+        },
+        "freeze": {
+          "frozen": {
+            "context_candidates_snapshot_ref": "ctx-snap-005",
+            "policy_bundle_snapshot_ref": "policy-snap-005",
+            "feature_snapshot_id": "feat-snap-005",
+            "approval_routing_snapshot_ref": "route-snap-005",
+            "quota_snapshot_ref": "quota-snap-005",
+            "scheduler_admission_input_snapshot_ref": "sched-snap-005"
+          },
+          "dynamic_used": [
+            "trace_tags"
+          ]
+        }
+      },
+      "expect": {
+        "decision": "fail_closed",
+        "reason_codes": [
+          "decision_dcu_exceeded"
+        ]
+      }
+    }
+  ]
+}

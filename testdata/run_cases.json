@@ -1,0 +1,57 @@
+{
+  "cases": [
+    {
+      "name": "create_and_advance_happy_path",
+      "create": {
+        "request_id": "case-create-1",
+        "tenant_id": "tenant-a",
+        "workflow_id": "wf-order",
+        "workflow_version": "v1",
+        "risk_tier": "low",
+        "input_payload_ref": "obj://input/1",
+        "snapshot": {
+          "policy_bundle_id": "pb-1",
+          "model_profile_id": "mp-1",
+          "dependency_bundle_id": "db-1",
+          "skill_bundle_set_hash": "skill-hash-1",
+          "context_policy_space_hash": "cps-1"
+        }
+      },
+      "advance": {
+        "step_id": "step-1",
+        "step_version": "1",
+        "idempotency_key": "idem-1",
+        "execution_receipt_ref": "rcpt://1",
+        "incoming_step_seq_id": 1,
+        "input_hash": "in-hash-1",
+        "output_hash": "out-hash-1",
+        "next_state": "RUNNING"
+      }
+    },
+    {
+      "name": "park_and_resume_happy_path",
+      "create": {
+        "request_id": "case-create-2",
+        "tenant_id": "tenant-b",
+        "workflow_id": "wf-refund",
+        "workflow_version": "v2",
+        "risk_tier": "medium",
+        "input_payload_ref": "obj://input/2",
+        "snapshot": {
+          "policy_bundle_id": "pb-2",
+          "model_profile_id": "mp-2",
+          "dependency_bundle_id": "db-2",
+          "skill_bundle_set_hash": "skill-hash-2",
+          "context_policy_space_hash": "cps-2"
+        }
+      },
+      "park": {
+        "step_id": "step-park",
+        "incoming_step_seq_id": 1,
+        "token_type": "park",
+        "park_reason": "waiting_tool",
+        "ttl_seconds": 600
+      }
+    }
+  ]
+}
