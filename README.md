@@ -1,50 +1,120 @@
-# Agent Infra (Phase 1 Decision Core)
+# Agent Infra System
 
-This repository now includes a production-style Go project skeleton for Decision-related Phase 1 capabilities from the simplified design document:
+[![CI](https://github.com/wandering-the-earth/agent_infra_system/actions/workflows/ci.yml/badge.svg)](https://github.com/wandering-the-earth/agent_infra_system/actions/workflows/ci.yml)
+[![Release](https://github.com/wandering-the-earth/agent_infra_system/actions/workflows/release.yml/badge.svg)](https://github.com/wandering-the-earth/agent_infra_system/actions/workflows/release.yml)
+[![Go Version](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
-- Runtime Decision Kernel (`pure function style`, frozen input required)
-- Decision Complexity Budget (DCU) profiles and runtime guard
-- Policy phase evaluation (`PRE_CONTEXT` / `PRE_TOOL` / `PRE_RESUME` / `PRE_RELEASE`) basics
-- Soft-failure retry guard (`decision_retry_limit_per_step`)
-- Decision/Run double-confirmation with pending repair worker
-- Scheduler admission decision + dispatch ticket + receipt validation
-- Release decision with evidence fusion
-- Approval case API + hard-timeout sweep
-- Decision outbox events + metric enforcement evaluation
+Enterprise-grade Agent infrastructure with a tri-kernel runtime model:
 
-## Project structure
+- Decision Kernel: policy-driven decisioning and safety constraints
+- Run Kernel: deterministic run-state progression and execution gating
+- Evidence Kernel: auditable event canon, replay, and root-cause artifacts
 
-```text
-agent/
-  cmd/agent-infra/main.go            # service entrypoint
-  internal/decision/                 # decision core service
-  internal/httpapi/                  # transport adapter (HTTP)
-  testdata/decision_cases.json       # executable test cases
-  doc/                               # architecture and governance docs
+---
+
+## What This Project Solves
+
+Modern Agent systems usually fail in three places:
+
+1. Decision uncertainty: model output is treated as execution permission
+2. Runtime drift: retries, callbacks, and long waits cause state inconsistency
+3. Audit gaps: incidents cannot be reconstructed with deterministic evidence
+
+This project addresses all three with explicit runtime contracts, cross-kernel verification, and evidence-first operations.
+
+---
+
+## Architecture At a Glance
+
+```mermaid
+flowchart LR
+  U[Client / Product API] --> H[HTTP Router]
+  H --> D[Decision Kernel]
+  H --> R[Run Kernel]
+  D -->|decision reference / admission / approval| R
+  D -->|outbox events| E[Evidence Kernel]
+  R -->|outbox events| E
+  E --> X[Replay Pack / Root Cause Pack / Ledger]
 ```
 
-## Run
+---
+
+## Core Design Principles
+
+1. Decide first, execute second
+2. Two-phase confirmation before side effects
+3. Stable binding for run/step/attempt/phase ownership
+4. Ticket + receipt resource governance
+5. Evidence is not logs; evidence is verifiable runtime truth
+6. Fail-safe posture for high-risk paths (fail-closed / review-required)
+
+---
+
+## Kernel Capability Matrix
+
+| Kernel | Responsibility | Typical APIs | Hard Guarantees |
+|---|---|---|---|
+| Decision | Runtime decisioning, admission, approval, obligations | `/v1/decision/*`, `/v1/approval/*`, `/v1/features/*` | policy-bound outcomes, budget guards, confirmation semantics |
+| Run | Run lifecycle, step progression, idempotency, continuations | `/v1/runs/*` | monotonic progress, state transition controls, execution gates |
+| Evidence | Event canon, decision graph, ledger, replay, integrity | `/v1/evidence/*`, `/v1/ledger/*` | replay-ready artifacts, integrity verification, retention controls |
+
+---
+
+## End-to-End Execution Contract
+
+A typical run follows this sequence:
+
+1. Create run context (`POST /v1/runs`)
+2. Evaluate runtime decision (`POST /v1/decision/evaluate-runtime`)
+3. Confirm run-advance eligibility (`POST /v1/decision/confirm-run-advance`)
+4. Obtain schedule admission ticket (`POST /v1/decision/evaluate-schedule-admission`)
+5. Advance run with execution receipt (`POST /v1/runs/{run_id}/advance`)
+6. If needed, complete approval flow (`/v1/approval/cases*`)
+7. Sync and analyze evidence (`/v1/evidence/*`)
+
+This sequence enforces that side effects are never executed on unconfirmed, unbound, or over-budget decisions.
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Go `1.26+`
+
+### Run
 
 ```bash
-/usr/local/go/bin/go run ./cmd/agent-infra
+go run ./cmd/agent-infra
 ```
 
-Server address defaults to `:8080`. Override with `AGENT_INFRA_ADDR`.
+Default listen address: `:8080`  
+Override with `AGENT_INFRA_ADDR`.
 
-## Test
+### Test
 
 ```bash
-/usr/local/go/bin/go test ./...
+go test ./... -count=1
 ```
+
+---
 
 ## CI / Release Workflow
 
-- CI: `.github/workflows/ci.yml`
-  - Triggers on push/PR to `master`/`main`
-  - Runs `gofmt` check, `go vet`, tests, and coverage gate
-- Release: `.github/workflows/release.yml`
-  - Triggers on tag push like `v1.0.0`
-  - Builds multi-platform binaries and publishes GitHub Release assets
+### Continuous Integration
+
+`/.github/workflows/ci.yml`
+
+- Trigger: push / pull_request on `master` and `main`
+- Steps: `gofmt` check, `go vet`, `go test`, coverage gate
+
+### Release Pipeline
+
+`/.github/workflows/release.yml`
+
+- Trigger: tag push (`v*`)
+- Actions: validate -> multi-platform build -> package -> checksum -> GitHub Release publish
 
 Create a release tag:
 
@@ -53,52 +123,39 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-## API (implemented)
+---
 
-- `POST /v1/context/resolve`
-- `POST /v1/decision/evaluate-runtime`
-- `POST /v1/decision/evaluate-schedule-admission`
-- `POST /v1/decision/evaluate-release`
-- `POST /v1/decision/confirm-run-advance`
-- `POST /v1/decision/repair-pending`
-- `POST /v1/approval/cases`
-- `POST /v1/approval/cases/{case_id}/decision`
-- `GET /v1/decision/{decision_id}`
-- `GET /v1/decision/outbox`
-- `GET /v1/metrics/decision`
+## Repository Layout
 
-## Example request (runtime decision)
-
-```bash
-curl -sS -X POST http://127.0.0.1:8080/v1/decision/evaluate-runtime \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "request_id":"req-demo-1",
-    "tenant_id":"tenant-a",
-    "workflow_id":"wf-a",
-    "run_id":"run-1",
-    "step_id":"step-1",
-    "risk_tier":"high",
-    "effect_type":"external_write",
-    "approval_system_available":true,
-    "policy_engine_available":true,
-    "phase":"PRE_TOOL",
-    "dcu_input":{
-      "feature_reads":2,
-      "rule_evals":3,
-      "dependency_calls":1,
-      "conflict_resolutions":1
-    },
-    "freeze":{
-      "frozen":{
-        "context_candidates_snapshot_ref":"ctx-001",
-        "policy_bundle_snapshot_ref":"pb-001",
-        "feature_snapshot_id":"fs-001",
-        "approval_routing_snapshot_ref":"ar-001",
-        "quota_snapshot_ref":"qs-001",
-        "scheduler_admission_input_snapshot_ref":"sa-001"
-      },
-      "dynamic_used":["trace_tags"]
-    }
-  }'
+```text
+agent/
+  cmd/agent-infra/                  # process entrypoint
+  internal/decision/                # decision kernel
+  internal/run/                     # run kernel
+  internal/evidence/                # evidence kernel
+  internal/httpapi/                 # transport adapter and kernel wiring
+  testdata/                         # executable sample cases
+  doc/
+    design/                         # architecture and design authority
+    specs/                          # executable policy/eval/skills specs
+    guides/                         # engineering and project reading guides
+    governance/                     # team process and governance rules
 ```
+
+---
+
+## Documentation Map
+
+- Design authority: [Agent系统设计-主文档.md](./doc/design/Agent系统设计-主文档.md)
+- Simplified production blueprint: [Agent-Infra-精简化落地方案-全问题覆盖.md](./doc/design/Agent-Infra-精简化落地方案-全问题覆盖.md)
+- Project mechanism overview: [Agent-Infra-项目说明-全流程原理与运行机制.md](./doc/guides/Agent-Infra-项目说明-全流程原理与运行机制.md)
+- Engineering code walkthrough: [工程代码导读-从零到跑通.md](./doc/guides/工程代码导读-从零到跑通.md)
+- Doc index: [doc/README.md](./doc/README.md)
+
+---
+
+## License
+
+This project is licensed under the Apache License 2.0.
+
+See [LICENSE](./LICENSE) and [NOTICE](./NOTICE) for details.
