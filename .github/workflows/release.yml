@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Resolve release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - name: Resolve tag metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            echo "This workflow must run on a tag ref (e.g. v1.0.0)."
+            echo "For workflow_dispatch, choose a tag in the Ref selector."
+            exit 1
+          fi
+
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.].+)?$ ]]; then
+            echo "Tag '$tag' does not match semver style (vMAJOR.MINOR.PATCH)."
+            exit 1
+          fi
+
+          prerelease=false
+          if [[ "$tag" == *"-"* ]]; then
+            prerelease=true
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  validate:
+    name: Validate before release
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Run tests
+        run: go test ./... -count=1
+
+  build:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    needs: [prepare, validate]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            archive: tar.gz
+          - goos: linux
+            goarch: arm64
+            archive: tar.gz
+          - goos: darwin
+            goarch: arm64
+            archive: tar.gz
+          - goos: windows
+            goarch: amd64
+            archive: zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Build and package
+        shell: bash
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          ARCHIVE: ${{ matrix.archive }}
+        run: |
+          set -euo pipefail
+
+          out_dir="dist"
+          mkdir -p "$out_dir"
+
+          bin_name="agent-infra"
+          if [[ "$GOOS" == "windows" ]]; then
+            bin_name="agent-infra.exe"
+          fi
+
+          pkg_name="agent-infra_${TAG}_${GOOS}_${GOARCH}"
+          work_dir="${out_dir}/${pkg_name}"
+          mkdir -p "$work_dir"
+
+          CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
+            go build -trimpath -ldflags "-s -w" \
+            -o "${work_dir}/${bin_name}" ./cmd/agent-infra
+
+          cp README.md "${work_dir}/README.md"
+
+          if [[ "$ARCHIVE" == "zip" ]]; then
+            archive_file="${out_dir}/${pkg_name}.zip"
+            (cd "$out_dir" && zip -q -r "$(basename "$archive_file")" "$pkg_name")
+          else
+            archive_file="${out_dir}/${pkg_name}.tar.gz"
+            tar -C "$out_dir" -czf "$archive_file" "$pkg_name"
+          fi
+
+          echo "Created $archive_file"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [prepare, build]
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum *.tar.gz *.zip > checksums.txt)
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Release ${{ needs.prepare.outputs.tag }}
+          generate_release_notes: true
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt

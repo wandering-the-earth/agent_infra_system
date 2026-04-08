@@ -37,6 +37,22 @@ Server address defaults to `:8080`. Override with `AGENT_INFRA_ADDR`.
 /usr/local/go/bin/go test ./...
 ```
 
+## CI / Release Workflow
+
+- CI: `.github/workflows/ci.yml`
+  - Triggers on push/PR to `master`/`main`
+  - Runs `gofmt` check, `go vet`, tests, and coverage gate
+- Release: `.github/workflows/release.yml`
+  - Triggers on tag push like `v1.0.0`
+  - Builds multi-platform binaries and publishes GitHub Release assets
+
+Create a release tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## API (implemented)
 
 - `POST /v1/context/resolve`

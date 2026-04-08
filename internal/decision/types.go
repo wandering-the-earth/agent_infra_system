@@ -519,10 +519,10 @@ type PendingRepairResult struct {
 }
 
 type SideEffectGateRequest struct {
-	DecisionID             string             `json:"decision_id"`
-	RunID                  string             `json:"run_id"`
-	StepID                 string             `json:"step_id"`
-	TenantID               string             `json:"tenant_id"`
+	DecisionID string `json:"decision_id"`
+	RunID      string `json:"run_id"`
+	StepID     string `json:"step_id"`
+	TenantID   string `json:"tenant_id"`
 	// RunState is optional caller context; final gate uses authoritative run state from RunStatePort.
 	RunState               string             `json:"run_state"`
 	ExecutionReceiptRef    string             `json:"execution_receipt_ref"`

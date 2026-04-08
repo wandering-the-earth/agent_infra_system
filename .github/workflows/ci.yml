@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+    branches: ["master", "main"]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: "1.26.x"
+  COVERAGE_THRESHOLD: "88.0"
+
+jobs:
+  test:
+    name: Lint, Vet, Test, Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Show Go version
+        run: go version
+
+      - name: Check formatting (gofmt)
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(find . -type f -name '*.go' -not -path './vendor/*')
+          if [ -z "$files" ]; then
+            echo "No Go files found."
+            exit 0
+          fi
+          unformatted=$(gofmt -l $files)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run tests with coverage
+        run: go test ./... -coverprofile=coverage.out -covermode=atomic -count=1
+
+      - name: Enforce coverage threshold
+        shell: bash
+        run: |
+          set -euo pipefail
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $3); print $3}')
+          echo "Total coverage: ${total}%"
+          awk -v total="$total" -v min="${COVERAGE_THRESHOLD}" 'BEGIN {
+            if (total + 0 < min + 0) {
+              printf("Coverage gate failed: %.1f%% < %.1f%%\n", total, min)
+              exit 1
+            }
+            printf("Coverage gate passed: %.1f%% >= %.1f%%\n", total, min)
+          }'
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          if-no-files-found: error

@@ -1,0 +1,13 @@
+# Coverage artifacts
+coverage.out
+*.cov
+*.cover
+
+# Go test binaries / build outputs
+*.test
+*.exe
+*.out
+bin/
+
+# macOS / editor noise
+.DS_Store
